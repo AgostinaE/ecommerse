@@ -1,145 +1,81 @@
-let productos = [];
-
-fetch("./js/productos.json")
-    .then(response => response.json())
-    .then(data => {
-        productos = data;
-        cargarProductos(productos);
-    })
-
-
 const contenedorProductos = document.querySelector("#contenedor-productos");
 const botonesCategorias = document.querySelectorAll(".boton-categoria");
-const tituloPrincipal = document.querySelector("#titulo-principal");
-let botonesAgregar = document.querySelectorAll(".producto-agregar");
 const numerito = document.querySelector("#numerito");
-
 
 botonesCategorias.forEach(boton => boton.addEventListener("click", () => {
     aside.classList.remove("aside-visible");
-}))
+}));
 
-
-function cargarProductos(productosElegidos) {
-
-    contenedorProductos.innerHTML = "";
-
-    productosElegidos.forEach(producto => {
-
-        const div = document.createElement("div");
-        div.classList.add("producto");
-        div.innerHTML = `
-            <img class="producto-imagen" src="${producto.imagen}" alt="${producto.titulo}">
-            <div class="producto-detalles">
-                <h3 class="producto-titulo">${producto.titulo}</h3>
-                <p class="producto-precio">$${producto.precio}</p>
-                <button class="producto-agregar" id="${producto.id}">Agregar</button>
-            </div>
-        `;
-
-        contenedorProductos.append(div);
-    })
-
-    actualizarBotonesAgregar();
+// Función para agregar productos al carrito
+async function agregarAlCarrito(event) {
+    const productId = event.target.id;
+    let cantidadProductosCarrito = parseInt(numerito.innerText) || 0;
+    cantidadProductosCarrito++;
+    numerito.innerText = cantidadProductosCarrito;
+    
+    try {
+        const product = await getProductById(productId);
+        productosEnCarrito.push(product);
+        localStorage.setItem("productos-en-carrito", JSON.stringify(productosEnCarrito));
+        cargarProductosCarrito();
+    } catch (error) {
+        console.error('Error al agregar el producto al carrito:', error);
+    }
+    
 }
 
-
-botonesCategorias.forEach(boton => {
-    boton.addEventListener("click", (e) => {
-
-        botonesCategorias.forEach(boton => boton.classList.remove("active"));
-        e.currentTarget.classList.add("active");
-
-        if (e.currentTarget.id != "todos") {
-            const productoCategoria = productos.find(producto => producto.categoria.id === e.currentTarget.id);
-            tituloPrincipal.innerText = productoCategoria.categoria.nombre;
-            const productosBoton = productos.filter(producto => producto.categoria.id === e.currentTarget.id);
-            cargarProductos(productosBoton);
-        } else {
-            tituloPrincipal.innerText = "Todos los productos";
-            cargarProductos(productos);
-        }
-
+fetch('https://fakestoreapi.com/products')
+    .then(response => response.json())
+    .then(async (products) => {
+        // Mostrar los productos en la página
+        await displayProducts(products);
     })
-});
+    .catch(error => {
+        console.error('Error fetching products:', error);
+    });
 
-function actualizarBotonesAgregar() {
-    botonesAgregar = document.querySelectorAll(".producto-agregar");
+async function displayProducts(products) {
+    contenedorProductos.innerHTML = "";
+    let totalCarrito = 0;
 
+    for (const product of products) {
+        const productDiv = createProductDiv(product);
+        contenedorProductos.appendChild(productDiv);
+        totalCarrito += product.price;
+    }
+
+    // Selección de los botones de agregar productos al carrito
+    const botonesAgregar = document.querySelectorAll(".producto-agregar");
     botonesAgregar.forEach(boton => {
         boton.addEventListener("click", agregarAlCarrito);
     });
+
+    // Mostrar el total del carrito
+    const contenedorTotal = document.querySelector("#total");
+    contenedorTotal.innerText = `$${totalCarrito}`;
 }
 
-let productosEnCarrito;
+function createProductDiv(product) {
+    const div = document.createElement("div");
+    div.classList.add("producto");
 
-let productosEnCarritoLS = localStorage.getItem("productos-en-carrito");
-
-if (productosEnCarritoLS) {
-    productosEnCarrito = JSON.parse(productosEnCarritoLS);
-    actualizarNumerito();
-} else {
-    productosEnCarrito = [];
-}
-
-function agregarAlCarrito(e) {
-
-    Toastify({
-        text: "Producto agregado",
-        duration: 3000,
-        close: true,
-        gravity: "top", // `top` or `bottom`
-        position: "right", // `left`, `center` or `right`
-        stopOnFocus: true, // Prevents dismissing of toast on hover
-        style: {
-          background: "linear-gradient(to right, #a83333, #e95c5c)",
-          borderRadius: "2rem",
-          textTransform: "uppercase",
-          fontSize: ".75rem"
-        },
-        offset: {
-            x: '1.5rem',
-            y: '1.5rem'
-          },
-        onClick: function(){}
-      }).showToast();
-
-    const idBoton = e.currentTarget.id;
-    const productoAgregado = productos.find(producto => producto.id === idBoton);
-
-    if(productosEnCarrito.some(producto => producto.id === idBoton)) {
-        const index = productosEnCarrito.findIndex(producto => producto.id === idBoton);
-        productosEnCarrito[index].cantidad++;
-    } else {
-        productoAgregado.cantidad = 1;
-        productosEnCarrito.push(productoAgregado);
+    // Si el producto está en oferta, resaltar visualmente
+    if (product.isOnSale) {
+        div.classList.add("producto-en-oferta");
     }
 
-    actualizarNumerito();
+    div.innerHTML = `
+        <div class="producto-imagen">
+            <img src="${product.image}" alt="${product.title}">
+        </div>
+        <div class="producto-detalles">
+            <h3 class="producto-titulo">${product.title}</h3>
+            <p class="producto-precio">$${product.price}</p>
+            <p class="producto-descripcion">${product.description.substring(0, 30)}</p>
+            <button class="producto-agregar" id="${product.id}">Agregar</button>
+        </div>
+    `;
 
-    localStorage.setItem("productos-en-carrito", JSON.stringify(productosEnCarrito));
+    return div;
 }
-
-function actualizarNumerito() {
-    let nuevoNumerito = productosEnCarrito.reduce((acc, producto) => acc + producto.cantidad, 0);
-    numerito.innerText = nuevoNumerito;
-}
-// Fetch products from the API
-fetch('http://fakestoreapi.com/products')
- .then(response => response.json())
- .then(products => {
-    // Display products on the page
-    const productContainer = document.getElementById('contenedor-productos');
-    products.forEach(product => {
-      const productDiv = document.createElement('div');
-      productDiv.innerHTML = `
-        <h3>${product.title}</h3>
-        <p>${product.description}</p>
-        <p>Precio: $${product.price}</p>
-      `;
-      productContainer.appendChild(productDiv);
-    });
-  })
- .catch(error => {
-    console.error('Error fetching products:', error);
-  });
+displayProducts();
